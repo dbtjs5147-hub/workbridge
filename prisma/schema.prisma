@@ -1,0 +1,364 @@
+// ============================================================
+// WorkBridge 데이터 모델 (Prisma + SQLite)
+//
+// 참고: SQLite는 enum / 배열(String[])을 직접 지원하지 않으므로
+//  - 상태값(enum)은 String 으로 저장하고, 코드(src/lib/constants.ts)에서 상수로 관리합니다.
+//  - 목록 데이터(기술스택, 태그 등)는 JSON 문자열(String)로 저장하고,
+//    src/lib/json.ts 의 헬퍼로 배열 <-> 문자열 변환합니다.
+// 운영(PostgreSQL) 전환 시 provider 와 일부 타입만 바꾸면 됩니다.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------- 사용자 ----------------------------
+
+model User {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  passwordHash    String? // 소셜 가입자는 비어있을 수 있음
+  role            String? // CLIENT | FREELANCER | (null = 미선택)
+  authProvider    String   @default("email") // email | google | kakao
+  profileImageUrl String?
+  bio             String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  clientProfile     ClientProfile?
+  freelancerProfile FreelancerProfile?
+
+  projects        Project[]      @relation("ClientProjects")
+  applications    Application[]
+  bookmarks       Bookmark[]
+  notifications   Notification[]
+  reviewsWritten  Review[]       @relation("ReviewsWritten")
+  reviewsReceived Review[]       @relation("ReviewsReceived")
+  signatures      ContractSignature[]
+}
+
+model ClientProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName String?
+  industry    String?
+  websiteUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FreelancerProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories            String   @default("[]") // JSON 배열
+  skills                String   @default("[]") // JSON 배열
+  experienceYears       Int      @default(0)
+  hourlyRate            Int      @default(0)
+  portfolioUrl          String?
+  githubUrl             String?
+  deployedProjectUrl    String?
+  projectTypeExperience String   @default("[]") // JSON 배열
+  portfolioImages       String   @default("[]") // 업로드한 포트폴리오 이미지 URL (JSON 배열)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ---------------------------- 프로젝트 ----------------------------
+
+model Project {
+  id               String   @id @default(cuid())
+  clientId         String
+  client           User     @relation("ClientProjects", fields: [clientId], references: [id])
+  title            String
+  description      String
+  category         String
+  budget           Int      @default(0)
+  recruitStartDate DateTime?
+  recruitEndDate   DateTime?
+  requiredSkills   String   @default("[]") // JSON 배열
+  status           String   @default("DRAFT") // ProjectStatus
+  prdDocument      String? // AI가 생성한 PRD 문서 (마크다운)
+  clarifyingAnswers String  @default("[]") // 확인 질문 Q&A (JSON: {question, answer}[])
+  isDeleted        Boolean  @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  aiAnalysis   AIAnalysis?
+  features     ProjectFeature[]
+  milestones   ProjectMilestone[]
+  applications Application[]
+  contract     Contract?
+  payments     Payment[]
+  deliveries   Delivery[]
+  reviews      Review[]
+  bookmarks    Bookmark[]
+}
+
+model AIAnalysis {
+  id                     String   @id @default(cuid())
+  projectId              String   @unique
+  project                Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  rawInput               String
+  projectSummary         String
+  userTypes              String   @default("[]") // JSON 배열
+  estimatedTotalCost     Int      @default(0)
+  estimatedDurationWeeks Int      @default(0)
+  recommendedTechStack   String   @default("[]") // JSON 배열
+  risks                  String   @default("[]") // JSON 배열
+  clarifyingQuestions    String   @default("[]") // JSON 배열
+  contractScopeDraft     String   @default("")
+  rawJson                String   @default("{}")
+  createdAt              DateTime @default(now())
+}
+
+model ProjectFeature {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  aiAnalysisId  String?
+  name          String
+  description   String   @default("")
+  priority      String   @default("MVP_REQUIRED") // MVP_REQUIRED | OPTIONAL | EXCLUDED
+  estimatedCost Int      @default(0)
+  rationale     String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ProjectMilestone {
+  id                 String   @id @default(cuid())
+  projectId          String
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title              String
+  description        String   @default("")
+  deliverables       String   @default("[]") // JSON 배열
+  acceptanceCriteria String   @default("[]") // JSON 배열
+  amount             Int      @default(0)
+  status             String   @default("PENDING") // MilestoneStatus
+  order              Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  payments   Payment[]
+  settlement Settlement?
+  deliveries Delivery[]
+
+  @@unique([projectId, order])
+}
+
+// ---------------------------- 지원/계약 ----------------------------
+
+model Application {
+  id               String   @id @default(cuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancerId     String
+  freelancer       User     @relation(fields: [freelancerId], references: [id])
+  coverLetter      String   @default("")
+  proposedAmount   Int      @default(0)
+  proposedDuration String   @default("")
+  relatedExperience String  @default("")
+  proposalText     String   @default("")
+  status           String   @default("PENDING") // ApplicationStatus
+  acceptedAt       DateTime?
+  rejectedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  contract Contract?
+
+  @@unique([projectId, freelancerId])
+}
+
+model Contract {
+  id                  String   @id @default(cuid())
+  projectId           String   @unique
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  applicationId       String   @unique
+  application         Application @relation(fields: [applicationId], references: [id])
+  clientId            String
+  freelancerId        String
+  agreedAmount        Int      @default(0)
+  contractScope       String   @default("")
+  excludedScope       String   @default("")
+  changeRequestPolicy String   @default("")
+  status              String   @default("DRAFT") // ContractStatus
+  contractBody        String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  signatures ContractSignature[]
+}
+
+model ContractSignature {
+  id            String   @id @default(cuid())
+  contractId    String
+  contract      Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  signedAt      DateTime @default(now())
+  signatureType String   @default("checkbox")
+  ipAddress     String?
+  userAgent     String?
+
+  @@unique([contractId, userId])
+}
+
+// ---------------------------- 결제/정산 ----------------------------
+
+model Payment {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id])
+  contractId    String?
+  milestoneId   String?
+  milestone     ProjectMilestone? @relation(fields: [milestoneId], references: [id])
+  clientId      String
+  freelancerId  String
+  amount        Int      @default(0)
+  pgProvider    String   @default("mock")
+  pgTransactionId String?
+  status        String   @default("READY") // PaymentStatus
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  settlement Settlement?
+}
+
+model Settlement {
+  id                    String   @id @default(cuid())
+  paymentId             String   @unique
+  payment               Payment  @relation(fields: [paymentId], references: [id])
+  milestoneId           String   @unique
+  milestone             ProjectMilestone @relation(fields: [milestoneId], references: [id])
+  grossAmount           Int      @default(0)
+  platformFee           Int      @default(0)
+  freelancerPayoutAmount Int     @default(0)
+  status                String   @default("NOT_READY") // SettlementStatus
+  settledAt             DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ---------------------------- 납품/변경요청 ----------------------------
+
+model Delivery {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestoneId    String
+  milestone      ProjectMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  freelancerId   String
+  deliveryUrl    String?
+  description    String   @default("")
+  attachmentUrls String   @default("[]") // JSON 배열
+  status         String   @default("REQUESTED") // REQUESTED | APPROVED | REVISION_REQUESTED
+  revisionNote   String?
+  requestedAt    DateTime @default(now())
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ---------------------------- 리뷰/알림/북마크 ----------------------------
+
+model Review {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviewerId String
+  reviewer   User     @relation("ReviewsWritten", fields: [reviewerId], references: [id])
+  revieweeId String
+  reviewee   User     @relation("ReviewsReceived", fields: [revieweeId], references: [id])
+  rating     Int      @default(5)
+  content    String   @default("")
+  tags       String   @default("[]") // JSON 배열
+  createdAt  DateTime @default(now())
+
+  @@unique([projectId, reviewerId, revieweeId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String   @default("")
+  targetUrl String?
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Bookmark {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancerId String
+  freelancer   User     @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([projectId, freelancerId])
+}
+
+// ---------------------------- 실시간 채팅 ----------------------------
+// 의뢰인 ↔ 프리랜서가 프로젝트 단위로 대화. (참여자 id는 단순 String으로 저장)
+
+model Conversation {
+  id           String    @id @default(cuid())
+  projectId    String
+  clientId     String
+  freelancerId String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  messages     Message[]
+
+  @@unique([projectId, clientId, freelancerId])
+  @@index([clientId])
+  @@index([freelancerId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+// ---------------------------- 변경 요청 ----------------------------
+// 계약 체결 후 의뢰인이 범위 변경/추가를 요청. AI가 기존 범위 포함 여부 참고 의견 제시.
+
+model ChangeRequest {
+  id               String    @id @default(cuid())
+  projectId        String
+  contractId       String
+  requesterId      String
+  description      String
+  reason           String    @default("")
+  additionalBudget Int       @default(0)
+  desiredDueDate   DateTime?
+  status           String    @default("PENDING") // PENDING | ACCEPTED | REJECTED
+  aiInScope        Boolean? // AI 판단: 기존 계약 범위 포함 여부 (참고용)
+  aiOpinion        String? // AI 참고 의견
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([contractId])
+}
