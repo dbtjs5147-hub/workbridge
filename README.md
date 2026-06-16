@@ -15,20 +15,26 @@
 
 ## 🚀 빠른 시작 (처음 한 번만)
 
-> 필요한 것: [Node.js](https://nodejs.org) 18 이상 (현재 v24에서 동작 확인)
+> 필요한 것: [Node.js](https://nodejs.org) 18 이상 (현재 v24에서 동작 확인), **PostgreSQL 연결 주소**
+> (무료 [Supabase](https://supabase.com) 추천 — 만드는 법은 [DEPLOY.md](./DEPLOY.md) 1단계 참고)
 
 ```bash
 # 1) 프로젝트 폴더에서 패키지 설치
 npm install
 
-# 2) 데이터베이스 생성 + 시연용 데이터 채우기 (한 번에)
+# 2) .env 파일을 만들고 DATABASE_URL 에 PostgreSQL 주소 입력
+#    (.env.example 를 복사해서 .env 로)
+
+# 3) 데이터베이스 표 생성 + 시연용 데이터 채우기 (한 번에)
 npm run setup
 
-# 3) 개발 서버 실행
+# 4) 개발 서버 실행
 npm run dev
 ```
 
 이제 브라우저에서 **http://localhost:3000** 에 접속하면 됩니다.
+
+> 📦 **인터넷에 공개(배포)하려면** → [DEPLOY.md](./DEPLOY.md) (Vercel + Supabase + Blob, 비개발자용 단계별 가이드)
 
 > 💡 **메모리(RAM)가 부족한 컴퓨터라면** (`JavaScript heap out of memory` 오류가 뜨면):
 > 개발 서버(`npm run dev`)는 메모리를 많이 씁니다. 다른 프로그램을 닫아 메모리를 확보하거나,
@@ -78,21 +84,24 @@ npm run dev
 - **프레임워크**: Next.js 15 (App Router) — 프론트엔드 + 백엔드 API를 한 앱에서 처리
 - **언어**: TypeScript
 - **스타일**: Tailwind CSS
-- **데이터베이스**: SQLite + Prisma ORM (운영 시 PostgreSQL로 손쉽게 전환 가능)
+- **데이터베이스**: PostgreSQL + Prisma ORM (로컬·운영 모두, Supabase 권장)
 - **인증**: JWT (httpOnly 쿠키) + bcrypt 비밀번호 해싱
 - **AI 분석**: mock 엔진 내장 (키 없이 동작) / Anthropic·OpenAI 키 입력 시 실제 LLM으로 자동 전환
+- **파일 저장**: 로컬은 `public/uploads`, 운영은 Vercel Blob(`BLOB_READ_WRITE_TOKEN` 있으면 자동 전환)
 - **결제**: PG sandbox(mock) — 멱등 처리, 실제 토스/포트원 연동 확장 가능
+- **배포**: Vercel (GitHub `main` 푸시 시 자동 배포)
 
 ---
 
 ## 🔑 환경 변수 (`.env`)
 
-`.env.example`를 복사해 `.env`로 만들면 됩니다. **키가 없어도 전부 동작**합니다.
+`.env.example`를 복사해 `.env`로 만들면 됩니다. **`DATABASE_URL` 외에는 비어 있어도 동작**합니다.
 
 | 변수 | 설명 | 비워두면 |
 |------|------|----------|
-| `DATABASE_URL` | DB 연결 | SQLite 로컬 파일 사용 |
+| `DATABASE_URL` | PostgreSQL 연결 주소 (Supabase) | ⚠️ **필수** (없으면 DB 동작 안 함) |
 | `JWT_SECRET` | 로그인 토큰 서명 키 | (기본값 있음, 운영 시 꼭 변경) |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob 파일 저장소 토큰 | 로컬 폴더 저장(배포 시 휘발) |
 | `AI_PROVIDER` | `mock`/`anthropic`/`openai` | mock 분석 엔진 동작 |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | 실제 AI 키 | mock 사용 |
 | `GOOGLE_*` / `KAKAO_*` | 소셜 로그인 | 데모 소셜 로그인 동작 |

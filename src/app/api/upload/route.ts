@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { put } from "@vercel/blob";
 import { requireUser, ok, fail } from "@/lib/api";
 
-// 데모용 로컬 파일 업로드.
-// ⚠️ 운영(Vercel 등 서버리스) 배포 시에는 파일시스템이 휘발성이므로
-//    S3 / Supabase Storage / Cloudflare R2 등 클라우드 스토리지로 교체해야 한다.
+// 파일 업로드.
+//  - 운영(Vercel): BLOB_READ_WRITE_TOKEN 이 있으면 Vercel Blob(클라우드)에 저장 → 영구 보관.
+//  - 로컬 개발: 토큰이 없으면 기존처럼 public/uploads 에 저장(휘발성, 데모용).
 const ALLOWED = new Set([
   "image/png",
   "image/jpeg",
@@ -46,13 +47,29 @@ export async function POST(req: NextRequest) {
     return fail("파일 크기는 10MB 이하여야 합니다.");
   }
 
+  const filename = `${crypto.randomUUID()}-${sanitize(file.name)}`;
+  const kind = file.type === "application/pdf" ? "pdf" : "image";
+
+  // 운영: Vercel Blob(클라우드 저장소)
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const blob = await put(`uploads/${filename}`, file, {
+        access: "public",
+        contentType: file.type,
+      });
+      return ok({ url: blob.url, name: file.name, kind });
+    } catch (e) {
+      console.error("[Blob 업로드 실패]", e);
+      return fail("파일 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.", 500);
+    }
+  }
+
+  // 로컬 개발: public/uploads 폴더에 저장
   const buffer = Buffer.from(await file.arrayBuffer());
   const dir = path.join(process.cwd(), "public", "uploads");
   await mkdir(dir, { recursive: true });
-  const filename = `${crypto.randomUUID()}-${sanitize(file.name)}`;
   await writeFile(path.join(dir, filename), buffer);
 
   const url = `/uploads/${filename}`;
-  const kind = file.type === "application/pdf" ? "pdf" : "image";
   return ok({ url, name: file.name, kind });
 }
