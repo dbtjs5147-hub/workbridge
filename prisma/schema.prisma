@@ -1,12 +1,12 @@
 // ============================================================
 // WorkBridge 데이터 모델 (Prisma + PostgreSQL)
 //
-// 참고: 초기엔 SQLite로 개발했으나 운영/배포(Vercel + Supabase)를 위해 PostgreSQL로 전환했습니다.
+// 참고: 초기엔 SQLite로 개발했으나 운영/배포(Vercel + Neon)를 위해 PostgreSQL로 전환했습니다.
 //  - 상태값(enum)은 String 으로 저장하고, 코드(src/lib/constants.ts)에서 상수로 관리합니다.
 //  - 목록 데이터(기술스택, 태그 등)는 JSON 문자열(String)로 저장하고,
 //    src/lib/json.ts 의 헬퍼로 배열 <-> 문자열 변환합니다.
 //    (PostgreSQL은 배열/enum을 지원하지만, 기존 코드 호환을 위해 String 방식을 유지합니다.)
-// 로컬 개발도 동일하게 Supabase(PostgreSQL) 연결 URL을 .env 의 DATABASE_URL 에 넣어 사용합니다.
+// 로컬 개발도 동일하게 Neon(PostgreSQL) 연결 URL을 .env 의 DATABASE_URL 에 넣어 사용합니다.
 // ============================================================
 
 generator client {
