@@ -79,7 +79,7 @@ export default function SignupPage() {
             />
           </div>
           <div>
-            <label className="label">비밀번호 (6자 이상)</label>
+            <label className="label">비밀번호 (8자 이상)</label>
             <input
               className="input"
               type="password"
@@ -127,14 +127,16 @@ export default function SignupPage() {
           </button>
         </form>
 
-        <div className="mt-4 space-y-2">
-          <a href="/api/auth/oauth/google" className="btn-secondary w-full">
-            Google로 시작 (데모)
-          </a>
-          <a href="/api/auth/oauth/kakao" className="btn-secondary w-full">
-            Kakao로 시작 (데모)
-          </a>
-        </div>
+        {process.env.NODE_ENV !== "production" && (
+          <div className="mt-4 space-y-2">
+            <a href="/api/auth/oauth/google" className="btn-secondary w-full">
+              Google로 시작 (데모)
+            </a>
+            <a href="/api/auth/oauth/kakao" className="btn-secondary w-full">
+              Kakao로 시작 (데모)
+            </a>
+          </div>
+        )}
 
         <p className="mt-6 text-center text-sm text-gray-500">
           이미 계정이 있으신가요?{" "}

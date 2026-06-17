@@ -1,10 +1,14 @@
 import { NextRequest } from "next/server";
 import { analyzeProject, AnalysisInputSchema } from "@/lib/ai";
 import { ok, fail } from "@/lib/api";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // 비로그인 "무료 체험"용 공개 분석 API. DB에 저장하지 않는다.
-// (실서비스에서는 IP 기준 rate limit을 권장)
 export async function POST(req: NextRequest) {
+  // 무인증 + AI 비용 발생 → IP당 10분에 15회로 비용 폭탄/DoS 방지
+  const limited = checkRateLimit(req, "public-ai", 15, 10 * 60_000);
+  if (limited) return limited;
+
   const body = await req.json().catch(() => null);
   const parsed = AnalysisInputSchema.safeParse(body);
   if (!parsed.success) {

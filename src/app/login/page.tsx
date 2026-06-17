@@ -86,17 +86,19 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-500">
-          <p className="mb-2 font-semibold text-gray-600">데모 계정 (클릭하면 자동 입력)</p>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => fill("client@test.com")} className="rounded-md bg-white px-2 py-1 ring-1 ring-gray-200">
-              의뢰인 client@test.com
-            </button>
-            <button onClick={() => fill("dev@test.com")} className="rounded-md bg-white px-2 py-1 ring-1 ring-gray-200">
-              프리랜서 dev@test.com
-            </button>
+        {process.env.NODE_ENV !== "production" && (
+          <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-500">
+            <p className="mb-2 font-semibold text-gray-600">데모 계정 (클릭하면 자동 입력)</p>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => fill("client@test.com")} className="rounded-md bg-white px-2 py-1 ring-1 ring-gray-200">
+                의뢰인 client@test.com
+              </button>
+              <button onClick={() => fill("dev@test.com")} className="rounded-md bg-white px-2 py-1 ring-1 ring-gray-200">
+                프리랜서 dev@test.com
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <p className="mt-6 text-center text-sm text-gray-500">
           아직 계정이 없으신가요?{" "}

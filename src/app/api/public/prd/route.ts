@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { ok, fail } from "@/lib/api";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { generateProjectPRD, AnalysisResultSchema } from "@/lib/ai";
 
 const schema = z.object({
@@ -14,6 +15,9 @@ const schema = z.object({
 
 // 비로그인 "무료 체험"용 공개 PRD 생성 API. DB에 저장하지 않는다.
 export async function POST(req: NextRequest) {
+  const limited = checkRateLimit(req, "public-ai", 15, 10 * 60_000);
+  if (limited) return limited;
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

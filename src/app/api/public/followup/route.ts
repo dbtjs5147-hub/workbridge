@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { ok } from "@/lib/api";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { generateFollowupQuestions, AnalysisResultSchema } from "@/lib/ai";
 
 const schema = z.object({
@@ -13,6 +14,9 @@ const schema = z.object({
 
 // 비로그인 체험용 후속 질문 (DB 저장 없음)
 export async function POST(req: NextRequest) {
+  const limited = checkRateLimit(req, "public-ai", 15, 10 * 60_000);
+  if (limited) return limited;
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return ok({ questions: [], provider: "none" });

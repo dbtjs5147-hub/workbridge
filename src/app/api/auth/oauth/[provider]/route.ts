@@ -16,9 +16,13 @@ export async function GET(
     return NextResponse.redirect(`${base}/login?error=unsupported_provider`);
   }
 
-  // (실제 키가 설정된 경우 여기서 provider 인증 URL로 redirect 하도록 확장)
+  // 보안: 실제 OAuth가 구현되지 않은 상태의 '데모 자동 로그인'은 인증 우회 구멍이므로
+  // 프로덕션에서는 비활성화한다. (실제 OAuth 연동 시 여기서 provider 인증 URL로 redirect)
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.redirect(`${base}/login?error=oauth_disabled`);
+  }
 
-  // --- 데모 흐름 ---
+  // --- 데모 흐름 (개발 환경 전용) ---
   const email = `${provider}-demo@workbridge.dev`;
   let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {

@@ -4,10 +4,20 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 
 const COOKIE_NAME = "wb_token";
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? "workbridge-fallback-dev-secret-change-me-please"
-);
 const TOKEN_MAX_AGE = 60 * 60 * 24 * 7; // 7일
+
+// JWT 서명 키. 프로덕션에서 JWT_SECRET이 없으면 '실패'시킨다(하드코딩 폴백 금지).
+// 개발에서만 임시 키를 허용한다. (요청 시점에 평가 — 빌드 중 import 크래시 방지)
+function getSecret(): Uint8Array {
+  const s = process.env.JWT_SECRET;
+  if (s && s.length >= 16) return new TextEncoder().encode(s);
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET 환경변수가 설정되지 않았거나 너무 짧습니다(16자 이상). 프로덕션에서는 필수입니다."
+    );
+  }
+  return new TextEncoder().encode("dev-only-insecure-secret-do-not-use-in-prod");
+}
 
 export type SessionPayload = {
   userId: string;
@@ -32,14 +42,14 @@ export async function createToken(payload: SessionPayload): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(SECRET);
+    .sign(getSecret());
 }
 
 export async function verifyToken(
   token: string
 ): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecret());
     return {
       userId: payload.userId as string,
       email: payload.email as string,

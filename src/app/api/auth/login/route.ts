@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, setSessionCookie } from "@/lib/auth";
 import { ok, fail } from "@/lib/api";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
   email: z.string().email("올바른 이메일을 입력해 주세요."),
@@ -10,6 +11,10 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // 무차별 대입 방지: IP당 5분에 10회
+  const limited = checkRateLimit(req, "login", 10, 5 * 60_000);
+  if (limited) return limited;
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
