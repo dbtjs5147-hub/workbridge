@@ -20,6 +20,9 @@ export default async function HomePage() {
       prisma.project.count({ where: { status: "COMPLETED" } }),
     ]);
 
+  // 신뢰지표는 어느 정도 실적이 쌓였을 때만 노출(초기 0건 노출로 신뢰가 떨어지는 것 방지)
+  const showStats = completedCount >= 10;
+
   const primaryCta =
     user?.role === "CLIENT"
       ? { href: "/projects/new", label: "내 아이디어 분석받기" }
@@ -78,14 +81,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ===== 신뢰 지표 ===== */}
-      <section className="container-page">
-        <div className="card grid grid-cols-3 divide-x divide-gray-100 p-2 shadow-soft">
-          <Stat value={`${projectCount}건`} label="등록된 프로젝트" />
-          <Stat value={`${freelancerCount}명`} label="활동 개발자" />
-          <Stat value={`${completedCount}건`} label="완료된 거래" />
-        </div>
-      </section>
+      {/* ===== 신뢰 지표 (실적이 쌓인 뒤 노출) ===== */}
+      {showStats && (
+        <section className="container-page">
+          <div className="card grid grid-cols-3 divide-x divide-gray-100 p-2 shadow-soft">
+            <Stat value={`${projectCount}건`} label="등록된 프로젝트" />
+            <Stat value={`${freelancerCount}명`} label="활동 개발자" />
+            <Stat value={`${completedCount}건`} label="완료된 거래" />
+          </div>
+        </section>
+      )}
 
       {/* ===== 핵심 차별점 ===== */}
       <section className="container-page">
