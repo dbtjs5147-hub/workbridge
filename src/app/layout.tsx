@@ -69,7 +69,7 @@ export default function RootLayout({
                   거래하는 개발 외주 플랫폼.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-10 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-10 sm:grid-cols-4">
                 <FooterCol
                   title="서비스"
                   links={[
@@ -92,11 +92,25 @@ export default function RootLayout({
                     ["회원가입", "/signup"],
                   ]}
                 />
+                <FooterCol
+                  title="정책·정보"
+                  links={[
+                    ["이용약관", "/terms"],
+                    ["개인정보처리방침", "/privacy"],
+                    ["사업자정보", "/business"],
+                  ]}
+                />
               </div>
             </div>
-            <div className="mt-8 border-t border-gray-100 pt-6 text-xs text-gray-400">
-              © {new Date().getFullYear()} WorkBridge · 데모 환경입니다. 실제
-              결제·송금이 발생하지 않으며, 전자서명은 체크박스 동의 방식입니다.
+            <div className="mt-8 space-y-1 border-t border-gray-100 pt-6 text-xs text-gray-400">
+              <p>
+                [회사명] · 대표 [대표자명] · 사업자등록번호 [000-00-00000] ·
+                통신판매업 [제0000호] · 문의 [support@example.com]
+              </p>
+              <p>
+                © {new Date().getFullYear()} WorkBridge. 결제는 현재 PG 테스트
+                모드이며, 정식 출시 전까지 실제 송금은 이루어지지 않습니다.
+              </p>
             </div>
           </div>
         </footer>

@@ -125,6 +125,17 @@ export default function SignupPage() {
           >
             {loading ? "처리 중..." : "회원가입"}
           </button>
+          <p className="text-center text-xs leading-relaxed text-gray-400">
+            회원가입 시{" "}
+            <a href="/terms" className="text-brand-600 hover:underline">
+              이용약관
+            </a>{" "}
+            및{" "}
+            <a href="/privacy" className="text-brand-600 hover:underline">
+              개인정보처리방침
+            </a>
+            에 동의하는 것으로 간주됩니다.
+          </p>
         </form>
 
         {process.env.NODE_ENV !== "production" && (
