@@ -39,20 +39,20 @@ export default async function HomePage() {
           <div className="animate-fade-in space-y-6">
             <span className="chip border border-brand-200 bg-brand-50 text-brand-700">
               <Icon name="sparkles" className="mr-1 h-3.5 w-3.5" />
-              AI 기반 개발 외주 PM 플랫폼
+              개발 외주 매칭 · 개발 몰라도 OK
             </span>
             <h1 className="text-4xl font-extrabold leading-[1.15] text-gray-900 sm:text-5xl">
-              막연한 아이디어를,
+              아이디어를 정리해,
               <br />
               <span className="bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">
-                개발 가능한 명세
+                검증된 개발자
               </span>
-              로.
+              에게 맡기세요.
             </h1>
             <p className="max-w-xl text-lg leading-relaxed text-gray-600">
-              생각을 입력하면 AI가 <b>몇 가지 질문</b>으로 요구사항을 구체화하고,
-              기능·일정·마일스톤과 <b>PRD 문서</b>까지 자동으로 만들어줍니다.
-              비용은 검증된 개발자가 <b>직접 입찰</b>하고, <b>단계별 안전결제(에스크로)</b>로 거래하세요.
+              개발을 몰라도 괜찮아요. 생각을 적으면 <b>AI가 &lsquo;개발자가 이해할
+              명세&rsquo;로 정리</b>해 주고, <b>검증된 개발자들이 직접 견적</b>을
+              냅니다. 마음에 드는 개발자와 <b>단계별 안전결제</b>로 거래하세요.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href={primaryCta.href} className="btn-primary btn-lg">
