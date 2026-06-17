@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -9,6 +9,15 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  // 이메일 인증 결과(?verify=) 안내 — window 기반으로 읽어 Suspense 제약 회피
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("verify");
+    if (v === "success") setNotice("이메일 인증이 완료되었습니다. 로그인해 주세요.");
+    else if (v === "invalid")
+      setNotice("인증 링크가 만료되었거나 유효하지 않습니다.");
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +58,12 @@ export default function LoginPage() {
           WorkBridge 계정으로 로그인하세요.
         </p>
 
+        {notice && (
+          <p className="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">
+            {notice}
+          </p>
+        )}
+
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
             <label className="label">이메일</label>
@@ -61,7 +76,15 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="label">비밀번호</label>
+            <div className="flex items-center justify-between">
+              <label className="label">비밀번호</label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-brand-600 hover:underline"
+              >
+                비밀번호를 잊으셨나요?
+              </Link>
+            </div>
             <input
               className="input"
               type="password"

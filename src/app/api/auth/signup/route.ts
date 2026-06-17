@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { ok, fail } from "@/lib/api";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { sendVerificationEmail } from "@/lib/email";
 
 const schema = z.object({
   name: z.string().min(1, "이름을 입력해 주세요.").max(50),
@@ -38,6 +39,13 @@ export async function POST(req: NextRequest) {
       authProvider: "email",
     },
   });
+
+  // 이메일 인증 메일 발송(실패해도 가입은 진행 — 베스트에포트)
+  try {
+    await sendVerificationEmail(user.id, user.email, user.name);
+  } catch (e) {
+    console.error("[가입 인증메일 발송 실패]", e);
+  }
 
   await setSessionCookie({ userId: user.id, email: user.email, role: user.role });
   return ok({ id: user.id, role: user.role });

@@ -29,12 +29,14 @@ model User {
   authProvider    String   @default("email") // email | google | kakao
   profileImageUrl String?
   bio             String?
+  emailVerifiedAt DateTime? // 이메일 인증 완료 시각 (null = 미인증)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
 
   clientProfile     ClientProfile?
   freelancerProfile FreelancerProfile?
+  authTokens        AuthToken[]
 
   projects        Project[]      @relation("ClientProjects")
   applications    Application[]
@@ -43,6 +45,20 @@ model User {
   reviewsWritten  Review[]       @relation("ReviewsWritten")
   reviewsReceived Review[]       @relation("ReviewsReceived")
   signatures      ContractSignature[]
+}
+
+// 이메일 인증 / 비밀번호 재설정용 일회성 토큰
+model AuthToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // EMAIL_VERIFY | PASSWORD_RESET
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, type])
 }
 
 model ClientProfile {
