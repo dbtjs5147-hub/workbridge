@@ -30,9 +30,37 @@ function FooterCol({
 }
 
 export const metadata: Metadata = {
-  title: "WorkBridge — AI 기반 개발 외주 플랫폼",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://workbridge-mu.vercel.app"
+  ),
+  title: {
+    default: "WorkBridge — AI 개발 외주 매칭 플랫폼",
+    template: "%s · WorkBridge",
+  },
   description:
-    "모호한 아이디어를 AI가 기능·견적·일정·마일스톤으로 구조화하고, 안전하게 거래하는 개발 외주 플랫폼",
+    "개발을 몰라도 괜찮아요. 아이디어를 적으면 AI가 요구사항으로 정리하고, 검증된 개발자가 직접 견적을 냅니다. 단계별 안전결제(에스크로)로 안전하게 외주를 맡기세요.",
+  keywords: [
+    "개발 외주",
+    "프리랜서 개발자",
+    "외주 매칭",
+    "AI 요구사항",
+    "앱 개발 외주",
+    "웹 개발 외주",
+    "에스크로 안전결제",
+  ],
+  openGraph: {
+    title: "WorkBridge — AI 개발 외주 매칭 플랫폼",
+    description:
+      "아이디어를 정리해, 검증된 개발자에게 맡기세요. AI가 요구사항을 정리하고, 단계별 안전결제로 안전하게 거래합니다.",
+    siteName: "WorkBridge",
+    locale: "ko_KR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "WorkBridge — AI 개발 외주 매칭 플랫폼",
+    description: "아이디어를 정리해, 검증된 개발자에게 맡기세요.",
+  },
 };
 
 export default function RootLayout({

@@ -63,10 +63,12 @@ export default async function HomePage() {
                 프로젝트 둘러보기
               </Link>
             </div>
-            <p className="text-xs text-gray-400">
-              데모 계정 · 의뢰인 client@test.com / 개발자 dev@test.com (비밀번호
-              test1234)
-            </p>
+            {process.env.NODE_ENV !== "production" && (
+              <p className="text-xs text-gray-400">
+                데모 계정 · 의뢰인 client@test.com / 개발자 dev@test.com (비밀번호
+                test1234)
+              </p>
+            )}
           </div>
 
           {/* AI 흐름 미리보기 카드 */}
@@ -95,8 +97,8 @@ export default async function HomePage() {
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <Feature
             icon="document"
-            title="AI가 PRD까지 작성"
-            desc="아이디어 → 추가 질문 → 답변 → 완성된 요구사항 정의서(PRD). 개발자에게 그대로 전달됩니다."
+            title="AI가 요구사항서까지 작성"
+            desc="아이디어 → 추가 질문 → 답변 → 완성된 요구사항 정의서(PRD). 개발자에게 그대로 전달돼 소통 비용을 줄입니다."
           />
           <Feature
             icon="shield"
