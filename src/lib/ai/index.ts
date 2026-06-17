@@ -11,6 +11,8 @@ export type { QA } from "./prd";
 
 // 사용할 Claude 모델 (환경변수로 변경 가능). 키만 넣으면 mock → 실제 AI로 자동 전환.
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+// 사용할 Gemini 모델 (기본 gemini-2.5-flash). AI_PROVIDER="gemini" + GEMINI_API_KEY 설정 시 사용.
+const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 
 const SYSTEM_PROMPT = `너는 한국 개발 외주 시장을 깊이 아는 15년차 시니어 프로덕트 매니저 겸 테크리드다.
 개발을 모르는 의뢰인의 모호한 설명을, 개발자가 바로 착수할 수 있는 구조화된 명세로 바꾸는 것이 너의 일이다.
@@ -132,6 +134,39 @@ async function callOpenAI(input: AnalysisInput): Promise<unknown> {
   return extractJson(text);
 }
 
+// Gemini 저수준 호출 (system + user → 텍스트). jsonMode면 JSON 출력 모드로 요청.
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+async function callGemini(
+  system: string,
+  user: string,
+  jsonMode: boolean
+): Promise<string> {
+  const res = await fetch(`${GEMINI_BASE}/${GEMINI_MODEL}:generateContent`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": process.env.GEMINI_API_KEY ?? "",
+    },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents: [{ role: "user", parts: [{ text: user }] }],
+      generationConfig: {
+        maxOutputTokens: 8192,
+        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`Gemini API 오류: ${res.status}`);
+  const data = await res.json();
+  const parts = data?.candidates?.[0]?.content?.parts ?? [];
+  return parts.map((p: { text?: string }) => p?.text ?? "").join("");
+}
+
+async function callGeminiAnalysis(input: AnalysisInput): Promise<unknown> {
+  const text = await callGemini(SYSTEM_PROMPT, buildUserPrompt(input), true);
+  return extractJson(text);
+}
+
 // 마일스톤 합계 보정 (검수 기준: 합계 = 총견적)
 function reconcile(result: AnalysisResult): AnalysisResult {
   const milestoneSum = result.milestones.reduce((s, m) => s + m.amount, 0);
@@ -172,6 +207,15 @@ export async function analyzeProject(
       console.error("[AI] OpenAI 실패, mock으로 폴백:", e);
     }
   }
+  if (provider === "gemini" && process.env.GEMINI_API_KEY) {
+    try {
+      const raw = await callGeminiAnalysis(input);
+      const result = reconcile(AnalysisResultSchema.parse(raw));
+      return { result, provider: "gemini", usedFallback: false };
+    } catch (e) {
+      console.error("[AI] Gemini 실패, mock으로 폴백:", e);
+    }
+  }
 
   // mock (키 없거나 폴백)
   const result = reconcile(generateMockAnalysis(input));
@@ -185,6 +229,15 @@ export async function analyzeProject(
 // ============================================================
 // PRD 문서 생성 (아이디어 + AI 분석 + 의뢰인 확인 답변 → 마크다운 PRD)
 // ============================================================
+const PRD_SYSTEM_PROMPT = `너는 한국 개발 외주 시장을 깊이 아는 15년차 시니어 PM이다. 주어진 정보로 '개발자가 바로 착수할 수 있는' PRD(제품 요구사항 정의서)를 한국어 마크다운으로 작성한다.
+
+[작성 원칙]
+- 다음 순서의 섹션을 포함한다: 1) 개요 2) 목표·핵심 가치 3) 사용자 유형 4) 핵심 기능 명세(기능별 설명·우선순위·수용 기준) 5) 화면/주요 플로우 6) 비기능 요구사항(성능·보안·반응형) 7) 마일스톤 및 검수 기준 8) 일정(참고용임을 명시) 9) 리스크 10) 제외 범위 11) 계약 범위 초안.
+- 개발자가 해석의 여지 없이 구현할 수 있도록 구체적으로 쓴다. 수용 기준은 '측정·검증 가능한' 문장으로(모호한 표현 금지).
+- 의뢰인의 확인 답변(Q&A)이 주어지면 반드시 본문 곳곳에 반영하고, 답변으로 해소된 가정은 본문에 명시한다.
+- 일정은 확정이 아니라 참고용임을 분명히 적는다. **비용·금액은 본 문서에 적지 않는다** — 가격은 플랫폼이 정하지 않으며 검증된 개발자가 직접 입찰(밀봉)로 제시한다.
+- 제목(##)·목록·굵게를 활용해 가독성을 높인다. 과장 없이 실무적으로 작성한다.`;
+
 async function callAnthropicPRD(prompt: string): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -196,20 +249,52 @@ async function callAnthropicPRD(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
       max_tokens: 4000,
-      system: `너는 한국 개발 외주 시장을 깊이 아는 15년차 시니어 PM이다. 주어진 정보로 '개발자가 바로 착수할 수 있는' PRD(제품 요구사항 정의서)를 한국어 마크다운으로 작성한다.
-
-[작성 원칙]
-- 다음 순서의 섹션을 포함한다: 1) 개요 2) 목표·핵심 가치 3) 사용자 유형 4) 핵심 기능 명세(기능별 설명·우선순위·수용 기준) 5) 화면/주요 플로우 6) 비기능 요구사항(성능·보안·반응형) 7) 마일스톤 및 검수 기준 8) 일정·견적(참고용임을 명시) 9) 리스크 10) 제외 범위 11) 계약 범위 초안.
-- 개발자가 해석의 여지 없이 구현할 수 있도록 구체적으로 쓴다. 수용 기준은 '측정·검증 가능한' 문장으로(모호한 표현 금지).
-- 의뢰인의 확인 답변(Q&A)이 주어지면 반드시 본문 곳곳에 반영하고, 답변으로 해소된 가정은 본문에 명시한다.
-- 견적·일정은 확정이 아니라 참고용임을 분명히 적는다.
-- 제목(##)·목록·굵게를 활용해 가독성을 높인다. 과장 없이 실무적으로 작성한다.`,
+      system: PRD_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
     }),
   });
   if (!res.ok) throw new Error(`Anthropic PRD 오류: ${res.status}`);
   const data = await res.json();
   return data?.content?.[0]?.text ?? "";
+}
+
+async function callGeminiText(prompt: string): Promise<string> {
+  return callGemini(PRD_SYSTEM_PROMPT, prompt, false);
+}
+
+async function callOpenAIText(prompt: string): Promise<string> {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: PRD_SYSTEM_PROMPT },
+        { role: "user", content: prompt },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`OpenAI PRD 오류: ${res.status}`);
+  const data = await res.json();
+  return data?.choices?.[0]?.message?.content ?? "";
+}
+
+// 텍스트(마크다운/JSON) 생성용 공급자 라우팅. 설정된 provider로 호출하고,
+// 키가 없으면 null을 반환해 호출부에서 mock으로 폴백하게 한다.
+async function callProviderText(
+  prompt: string
+): Promise<{ text: string; provider: string } | null> {
+  const provider = process.env.AI_PROVIDER ?? "mock";
+  if (provider === "anthropic" && process.env.ANTHROPIC_API_KEY)
+    return { text: await callAnthropicPRD(prompt), provider: "anthropic" };
+  if (provider === "gemini" && process.env.GEMINI_API_KEY)
+    return { text: await callGeminiText(prompt), provider: "gemini" };
+  if (provider === "openai" && process.env.OPENAI_API_KEY)
+    return { text: await callOpenAIText(prompt), provider: "openai" };
+  return null;
 }
 
 // ============================================================
@@ -240,25 +325,24 @@ export async function assessChangeRequest(input: {
   description: string;
   reason?: string;
 }): Promise<{ inScope: boolean; opinion: string }> {
-  const provider = process.env.AI_PROVIDER ?? "mock";
-  if (provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
-    try {
-      const prompt = [
-        `너는 개발 외주 계약 분쟁을 중재하는 시니어 PM이다. 아래 변경 요청이 '기존 계약 납품 범위'에 이미 포함되는지(=무상 처리 대상), 아니면 추가 작업(=별도 견적·일정 협의 대상)인지 판단하라.`,
-        `\n[기존 계약 납품 범위]\n${input.contractScope}`,
-        `\n[의뢰인의 변경 요청]\n${input.description}`,
-        input.reason ? `요청 사유: ${input.reason}` : "",
-        `\n[판단 기준] 요청이 기존 범위 문구/기능과 직접 겹치면 inScope=true. 새로운 기능, 외부 연동, 기존에 없던 화면/데이터가 필요하면 inScope=false. opinion에는 양측이 납득할 수 있는 실무적 근거와 다음 행동(예: 추가 마일스톤 협의)을 한두 문장으로 제시하라.`,
-        `\n순수 JSON만 출력: {"inScope": boolean, "opinion": "한국어 한두 문장"}`,
-      ].join("\n");
-      const text = await callAnthropicPRD(prompt);
-      const json = extractJson(text) as { inScope?: boolean; opinion?: string };
+  try {
+    const prompt = [
+      `너는 개발 외주 계약 분쟁을 중재하는 시니어 PM이다. 아래 변경 요청이 '기존 계약 납품 범위'에 이미 포함되는지(=무상 처리 대상), 아니면 추가 작업(=별도 견적·일정 협의 대상)인지 판단하라.`,
+      `\n[기존 계약 납품 범위]\n${input.contractScope}`,
+      `\n[의뢰인의 변경 요청]\n${input.description}`,
+      input.reason ? `요청 사유: ${input.reason}` : "",
+      `\n[판단 기준] 요청이 기존 범위 문구/기능과 직접 겹치면 inScope=true. 새로운 기능, 외부 연동, 기존에 없던 화면/데이터가 필요하면 inScope=false. opinion에는 양측이 납득할 수 있는 실무적 근거와 다음 행동(예: 추가 마일스톤 협의)을 한두 문장으로 제시하라.`,
+      `\n순수 JSON만 출력: {"inScope": boolean, "opinion": "한국어 한두 문장"}`,
+    ].join("\n");
+    const out = await callProviderText(prompt);
+    if (out) {
+      const json = extractJson(out.text) as { inScope?: boolean; opinion?: string };
       if (typeof json.inScope === "boolean" && typeof json.opinion === "string") {
         return { inScope: json.inScope, opinion: json.opinion };
       }
-    } catch (e) {
-      console.error("[변경요청 AI 판단 실패, mock 폴백]", e);
     }
+  } catch (e) {
+    console.error("[변경요청 AI 판단 실패, mock 폴백]", e);
   }
   return mockAssessChange(input.contractScope, input.description);
 }
@@ -271,30 +355,29 @@ export async function generateFollowupQuestions(
   analysis: AnalysisResult,
   answers: QA[]
 ): Promise<{ questions: string[]; provider: string }> {
-  const provider = process.env.AI_PROVIDER ?? "mock";
-  if (provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
-    try {
-      const prompt = [
-        "너는 시니어 PM이다. 아래 프로젝트와 '의뢰인의 1차 답변'을 읽고, PRD를 더 정확히 쓰기 위해 추가로 꼭 필요한 후속 질문 2~3개만 만들어라.",
-        "이미 답변된 내용은 다시 묻지 말고, 답변에서 새로 드러난 모호함이나 빠진 핵심(권한·정책·데이터·연동·일정 등)을 구체적으로 물어라. 답변이 충분하면 빈 배열을 반환해도 된다.",
-        `\n프로젝트 요약: ${analysis.projectSummary}`,
-        `핵심 기능: ${analysis.features.map((f) => f.name).join(", ")}`,
-        `\n1차 질문과 답변:\n${answers
-          .map((a) => `- Q: ${a.question}\n  A: ${a.answer || "(미응답)"}`)
-          .join("\n")}`,
-        `\n순수 JSON만 출력: {"questions": string[]}`,
-      ].join("\n");
-      const text = await callAnthropicPRD(prompt);
-      const json = extractJson(text) as { questions?: unknown };
+  try {
+    const prompt = [
+      "너는 시니어 PM이다. 아래 프로젝트와 '의뢰인의 1차 답변'을 읽고, PRD를 더 정확히 쓰기 위해 추가로 꼭 필요한 후속 질문 2~3개만 만들어라.",
+      "이미 답변된 내용은 다시 묻지 말고, 답변에서 새로 드러난 모호함이나 빠진 핵심(권한·정책·데이터·연동·일정 등)을 구체적으로 물어라. 답변이 충분하면 빈 배열을 반환해도 된다.",
+      `\n프로젝트 요약: ${analysis.projectSummary}`,
+      `핵심 기능: ${analysis.features.map((f) => f.name).join(", ")}`,
+      `\n1차 질문과 답변:\n${answers
+        .map((a) => `- Q: ${a.question}\n  A: ${a.answer || "(미응답)"}`)
+        .join("\n")}`,
+      `\n순수 JSON만 출력: {"questions": string[]}`,
+    ].join("\n");
+    const out = await callProviderText(prompt);
+    if (out) {
+      const json = extractJson(out.text) as { questions?: unknown };
       if (Array.isArray(json.questions)) {
         return {
           questions: json.questions.map((q) => String(q)).slice(0, 3),
-          provider: "anthropic",
+          provider: out.provider,
         };
       }
-    } catch (e) {
-      console.error("[후속질문 AI 실패, mock 폴백]", e);
     }
+  } catch (e) {
+    console.error("[후속질문 AI 실패, mock 폴백]", e);
   }
   return {
     questions: generateMockFollowups(idea, analysis, answers),
@@ -308,21 +391,18 @@ export async function generateProjectPRD(
   answers: QA[],
   title: string
 ): Promise<{ prd: string; provider: string }> {
-  const provider = process.env.AI_PROVIDER ?? "mock";
-  if (provider === "anthropic" && process.env.ANTHROPIC_API_KEY) {
-    try {
-      const prompt = [
-        `프로젝트 제목: ${title}`,
-        `아이디어: ${idea}`,
-        `AI 분석 결과(JSON): ${JSON.stringify(analysis)}`,
-        `의뢰인 확인 답변: ${JSON.stringify(answers)}`,
-        "위 정보를 바탕으로 개발자에게 전달할 완성된 PRD를 마크다운으로 작성해줘.",
-      ].join("\n");
-      const prd = await callAnthropicPRD(prompt);
-      if (prd.trim()) return { prd, provider: "anthropic" };
-    } catch (e) {
-      console.error("[PRD] Anthropic 실패, mock으로 폴백:", e);
-    }
+  try {
+    const prompt = [
+      `프로젝트 제목: ${title}`,
+      `아이디어: ${idea}`,
+      `AI 분석 결과(JSON): ${JSON.stringify(analysis)}`,
+      `의뢰인 확인 답변: ${JSON.stringify(answers)}`,
+      "위 정보를 바탕으로 개발자에게 전달할 완성된 PRD를 마크다운으로 작성해줘.",
+    ].join("\n");
+    const out = await callProviderText(prompt);
+    if (out && out.text.trim()) return { prd: out.text, provider: out.provider };
+  } catch (e) {
+    console.error("[PRD] 생성 실패, mock으로 폴백:", e);
   }
   return { prd: generateMockPRD(idea, analysis, answers, title), provider: "mock" };
 }
