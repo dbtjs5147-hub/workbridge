@@ -7,6 +7,9 @@ import { formatKRW } from "@/lib/format";
 import { CONTRACT_STATUS, MILESTONE_STATUS } from "@/lib/constants";
 import { FileUploader } from "@/components/FileUploader";
 import { Attachments } from "@/components/Attachments";
+import { TossPayButton } from "@/components/TossPayButton";
+
+const TOSS_ENABLED = !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
 
 type Milestone = {
   id: string;
@@ -174,17 +177,25 @@ export function ContractFlow({
             {/* 액션 */}
             {signed && (
               <div className="mt-3">
-                {m.status === MILESTONE_STATUS.PAYMENT_PENDING && isClient && (
-                  <button
-                    onClick={() => call(`/api/milestones/${m.id}/pay`, undefined, `pay-${m.id}`)}
-                    disabled={!!busy}
-                    className="btn-primary w-full"
-                  >
-                    {busy === `pay-${m.id}`
-                      ? "결제 중..."
-                      : `${formatKRW(m.amount)} 에스크로 결제하기 (sandbox)`}
-                  </button>
-                )}
+                {m.status === MILESTONE_STATUS.PAYMENT_PENDING && isClient &&
+                  (TOSS_ENABLED ? (
+                    <TossPayButton
+                      milestoneId={m.id}
+                      amount={m.amount}
+                      orderName={`${m.order + 1}. ${m.title}`}
+                      contractId={contractId}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => call(`/api/milestones/${m.id}/pay`, undefined, `pay-${m.id}`)}
+                      disabled={!!busy}
+                      className="btn-primary w-full"
+                    >
+                      {busy === `pay-${m.id}`
+                        ? "결제 중..."
+                        : `${formatKRW(m.amount)} 에스크로 결제하기 (sandbox)`}
+                    </button>
+                  ))}
                 {m.status === MILESTONE_STATUS.PAYMENT_PENDING && isFreelancer && (
                   <p className="text-center text-sm text-gray-400">
                     의뢰인의 결제를 기다리고 있습니다.
