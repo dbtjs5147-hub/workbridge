@@ -141,25 +141,40 @@ async function callGemini(
   user: string,
   jsonMode: boolean
 ): Promise<string> {
-  const res = await fetch(`${GEMINI_BASE}/${GEMINI_MODEL}:generateContent`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-goog-api-key": process.env.GEMINI_API_KEY ?? "",
+  const body = JSON.stringify({
+    system_instruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [{ text: user }] }],
+    generationConfig: {
+      maxOutputTokens: 8192,
+      ...(jsonMode ? { responseMimeType: "application/json" } : {}),
     },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: {
-        maxOutputTokens: 8192,
-        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
-      },
-    }),
   });
-  if (!res.ok) throw new Error(`Gemini API 오류: ${res.status}`);
-  const data = await res.json();
-  const parts = data?.candidates?.[0]?.content?.parts ?? [];
-  return parts.map((p: { text?: string }) => p?.text ?? "").join("");
+  // 일시적 오류(429 한도/5xx 과부하)는 지수 백오프로 재시도. 그 외는 즉시 실패.
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(`${GEMINI_BASE}/${GEMINI_MODEL}:generateContent`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": process.env.GEMINI_API_KEY ?? "",
+      },
+      body,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const parts = data?.candidates?.[0]?.content?.parts ?? [];
+      const text = parts.map((p: { text?: string }) => p?.text ?? "").join("");
+      if (!text.trim()) throw new Error("Gemini 빈 응답");
+      return text;
+    }
+    lastStatus = res.status;
+    if (res.status === 429 || res.status >= 500) {
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      continue;
+    }
+    break; // 400 등 영구 오류는 재시도 무의미
+  }
+  throw new Error(`Gemini API 오류: ${lastStatus}`);
 }
 
 async function callGeminiAnalysis(input: AnalysisInput): Promise<unknown> {
