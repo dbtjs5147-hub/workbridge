@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { SocialLoginButtons } from "@/components/SocialLoginButtons";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,12 +12,26 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
 
-  // 이메일 인증 결과(?verify=) 안내 — window 기반으로 읽어 Suspense 제약 회피
+  // ?verify= / ?error= 안내 — window 기반으로 읽어 Suspense 제약 회피
   useEffect(() => {
-    const v = new URLSearchParams(window.location.search).get("verify");
+    const sp = new URLSearchParams(window.location.search);
+    const v = sp.get("verify");
     if (v === "success") setNotice("이메일 인증이 완료되었습니다. 로그인해 주세요.");
     else if (v === "invalid")
       setNotice("인증 링크가 만료되었거나 유효하지 않습니다.");
+
+    const err = sp.get("error");
+    if (err) {
+      const map: Record<string, string> = {
+        oauth_unavailable: "소셜 로그인이 아직 설정되지 않았습니다.",
+        oauth_canceled: "소셜 로그인이 취소되었습니다.",
+        oauth_state: "보안 확인에 실패했습니다. 다시 시도해 주세요.",
+        oauth_failed: "소셜 로그인에 실패했습니다. 다시 시도해 주세요.",
+        account_disabled: "비활성화된 계정입니다.",
+        unsupported_provider: "지원하지 않는 로그인 방식입니다.",
+      };
+      setError(map[err] ?? "로그인 중 문제가 발생했습니다.");
+    }
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -108,6 +123,8 @@ export default function LoginPage() {
             {loading ? "처리 중..." : "로그인"}
           </button>
         </form>
+
+        <SocialLoginButtons label="로그인" />
 
         {process.env.NODE_ENV !== "production" && (
           <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-500">

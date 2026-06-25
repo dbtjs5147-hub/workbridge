@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ROLES, ROLE_LABEL } from "@/lib/constants";
+import { SocialLoginButtons } from "@/components/SocialLoginButtons";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -138,16 +139,7 @@ export default function SignupPage() {
           </p>
         </form>
 
-        {process.env.NODE_ENV !== "production" && (
-          <div className="mt-4 space-y-2">
-            <a href="/api/auth/oauth/google" className="btn-secondary w-full">
-              Google로 시작 (데모)
-            </a>
-            <a href="/api/auth/oauth/kakao" className="btn-secondary w-full">
-              Kakao로 시작 (데모)
-            </a>
-          </div>
-        )}
+        <SocialLoginButtons label="가입" />
 
         <p className="mt-6 text-center text-sm text-gray-500">
           이미 계정이 있으신가요?{" "}
